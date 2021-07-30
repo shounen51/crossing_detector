@@ -37,12 +37,14 @@ class area():
         _t = areaDict['hour'].split(',')
         self.areaName = areaDict['areaName']
         self.timeSlot = (int(_t[0]),int(_t[1]))
+
         sec = float(areaDict['sec'])
-        # if sec > 0.1:
-        #     self.residenceTimeLimit = float(areaDict['sec'])
-        # else:
-        #     self.residenceTimeLimit = 0.1
-        self.residenceTimeLimit = float(areaDict['sec'])
+        if sec > 0.1:
+            self.residenceTimeLimit = float(areaDict['sec'])
+        else:
+            self.residenceTimeLimit = 0.1
+        # self.residenceTimeLimit = float(areaDict['sec'])
+
         self.residenceTime = 0
         self.lastTimmer = time.time()
         self.stopTimmer = 0
@@ -88,10 +90,7 @@ class area():
         elif not _check_week(self.week):
             return (120,120,120)
         else:
-            if self.residenceTimeLimit == 0:
-                H = 0
-            else:
-                H = int((1-(self.residenceTime/self.residenceTimeLimit))*60)
+            H = int((1-(self.residenceTime/self.residenceTimeLimit))*60)
             S = 255
             V = 255
             a = np.array([[[H,S,V]]],dtype='uint8')
