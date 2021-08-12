@@ -37,18 +37,37 @@ class area():
         _t = areaDict['hour'].split(',')
         self.areaName = areaDict['areaName']
         self.timeSlot = (int(_t[0]),int(_t[1]))
-
         sec = float(areaDict['sec'])
-        if sec > 0.1:
-            self.residenceTimeLimit = float(areaDict['sec'])
-        else:
-            self.residenceTimeLimit = 0.1
-        # self.residenceTimeLimit = float(areaDict['sec'])
+        # if sec > 0.1:
+        #     self.residenceTimeLimit = float(areaDict['sec'])
+        # else:
+        #     self.residenceTimeLimit = 0.1
+        self.residenceTimeLimit = float(areaDict['sec'])
 
+        self.map = np.zeros((1080,1920, 3), dtype='uint8')
+        self._make_map()        
         self.residenceTime = 0
         self.lastTimmer = time.time()
         self.stopTimmer = 0
         self.timeMode = 0 # 0=down 1=raise 2=stop
+
+    def _make_map(self):
+        new_point = []
+        for p in self.points:
+            x = int(p[0]*1920)
+            y = int(p[1]*1080)
+            new_point.append([x,y])
+        pts = np.array(new_point, np.int32)
+        pts = pts.reshape((-1,1,2))
+        cv2.fillPoly(self.map, [pts], (255,255,255))
+
+    def check(self, points):
+        result = np.array(points[:,0], np.bool)
+        for index, p in enumerate(points):
+            x = int(p[0]*1920)
+            y = int(p[1]*1080)
+            result[index] = ((self.map[y, x]>0)[0])
+        return result
 
     def trigger(self):
         if self.timeMode != 1:
@@ -90,7 +109,10 @@ class area():
         elif not _check_week(self.week):
             return (120,120,120)
         else:
-            H = int((1-(self.residenceTime/self.residenceTimeLimit))*60)
+            if self.residenceTimeLimit == 0:
+                H = 0
+            else:
+                H = int((1-(self.residenceTime/self.residenceTimeLimit))*60)
             S = 255
             V = 255
             a = np.array([[[H,S,V]]],dtype='uint8')
@@ -157,6 +179,7 @@ class crossing_detector():
             return []
         # bboxes = self._bbox2cxdyty(bbox_xyxy)
         bboxes = bbox_xyxy
+        
         temp = np.zeros([bboxes.shape[0],len(self.areaDict)], dtype=bool)
         trackThem = np.zeros([bboxes.shape[0],len(self.areaDict)], dtype=bool)
         alarmType = '0'
@@ -166,8 +189,9 @@ class crossing_detector():
                 continue
             if not _check_week(area.week):
                 continue
-            td = 1
-            temp = is_point_in_here(temp, aindex, area, bboxes, td)
+            # td = 1
+            # temp = is_point_in_here(temp, aindex, area, bboxes, td)
+            temp[:,aindex] = area.check(bboxes)
             alarm = False
             if temp[:,aindex].any() == True:
                 alarm = area.trigger()
@@ -204,10 +228,10 @@ def is_point_in_here(temp, aindex, area, bboxes, td=1):
         bottom = np.full_like(ytemp, max(point1[1], point2[1]))
 
         _mask = ytemp >= bboxes[:,td]
-        # _mask2 = np.logical_and(top <= ytemp, ytemp <= bottom)
-        _mask3 = np.logical_and(left <= bboxes[:,0], bboxes[:,0] <= right)
+        _mask2 = np.logical_and(left < bboxes[:,0], bboxes[:,0] < right)
+        _mask3 = np.logical_or(bboxes[:,0] == point1[0], _mask2)
 
-        # _mask = np.logical_and(_mask, _mask2)
+        _mask3 = np.logical_or(_mask2, _mask3)
         _mask = np.logical_and(_mask, _mask3)
         temp[:,aindex] = np.logical_xor(temp[:,aindex], _mask)
     return temp
@@ -274,7 +298,7 @@ if __name__ == "__main__":
     "alertType": "1",
     "day": "1111111",
     "hour": "0,24",
-    "sec": "0"
+    "sec": "5"
 }
     detector = crossing_detector()
     detector.add_area_dict(areaSetDict)
@@ -291,7 +315,7 @@ if __name__ == "__main__":
     #     print('--------------------')
     #     time.sleep(0.5)
 
-    bbox_xyxy_list = np.array([[813.0,454.0],[883.0,554.0]])
+    bbox_xyxy_list = np.array([[83.0,454.0],[883.0,554.0]])
     bbox_xyxy_list[:,0::2] = bbox_xyxy_list[:,0::2] / size[0]
     bbox_xyxy_list[:,1::2] = bbox_xyxy_list[:,1::2] / size[1]
     while 1:
